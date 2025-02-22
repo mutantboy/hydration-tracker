@@ -1,15 +1,15 @@
 <script lang="ts">
   import { invalidate } from "$app/navigation";
   import { onMount } from "svelte";
-  import type { SupabaseClient } from "@supabase/supabase-js";
-  import type { Session } from "@supabase/supabase-js";
+  import type { SupabaseClient, Session } from "@supabase/supabase-js";
 
-  type PageData = {
-    supabase: SupabaseClient;
-    session: Session | null;
-  };
-
-  let { data } = $props<{ data: PageData }>();
+  let { data, children } = $props<{
+    data: {
+      supabase: SupabaseClient;
+      session: Session | null;
+    };
+    children: () => any;
+  }>();
   let supabase = $state(data.supabase);
   let session = $state(data.session);
 
@@ -33,4 +33,6 @@
   });
 </script>
 
-{@render $$slots.default()}
+{#if children}
+  {@render children()}
+{/if}
