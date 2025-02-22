@@ -2,13 +2,7 @@
   import { enhance } from "$app/forms";
   import type { SubmitFunction } from "@sveltejs/kit";
 
-  type Props = {
-    data: {
-      hydrationEntries: any[];
-    };
-  };
-
-  let { data } = $props<Props>();
+  let { data } = $props();
   let { hydrationEntries } = data;
   let amount = $state(0);
   let loading = $state(false);

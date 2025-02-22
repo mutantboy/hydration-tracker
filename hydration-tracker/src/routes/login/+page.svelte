@@ -3,11 +3,7 @@
   import type { SubmitFunction } from "@sveltejs/kit";
   import type { ActionData } from "./$types";
 
-  interface Props {
-    form: ActionData;
-  }
-
-  let { form } = $props<Props>();
+  let { form } = $props();
   let loading = $state(false);
 
   const handleSubmit: SubmitFunction = () => {
