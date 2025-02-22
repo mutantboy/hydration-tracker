@@ -1,14 +1,21 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
-  export let data;
+  import type { SubmitFunction } from "@sveltejs/kit";
 
-  let { hydrationEntries, session } = data;
-  let amount = 0;
-  let loading = false;
+  type Props = {
+    data: {
+      hydrationEntries: any[];
+    };
+  };
 
-  const handleSubmit = () => {
+  let { data } = $props<Props>();
+  let { hydrationEntries } = data;
+  let amount = $state(0);
+  let loading = $state(false);
+
+  const handleSubmit: SubmitFunction = () => {
     loading = true;
-    return async ({ update }) => {
+    return async ({ update }: { update: () => Promise<void> }) => {
       loading = false;
       await update();
     };

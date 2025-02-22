@@ -1,5 +1,5 @@
-<script>
-  import { page } from "$app/state";
+<script lang="ts">
+  import { page } from "$app/stores";
   import AuthForm from "$lib/AuthForm.svelte";
   import HydrationTracker from "$lib/HydrationTracker.svelte";
 </script>

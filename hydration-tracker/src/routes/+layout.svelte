@@ -1,17 +1,15 @@
 <script lang="ts">
   import { invalidate } from "$app/navigation";
   import { onMount } from "svelte";
-  import type { SupabaseClient, Session } from "@supabase/supabase-js";
+  import type { SupabaseClient } from "@supabase/supabase-js";
+  import type { Session } from "@supabase/supabase-js";
 
-  type Props = {
-    data: {
-      supabase: SupabaseClient;
-      session: Session | null;
-    };
+  type PageData = {
+    supabase: SupabaseClient;
+    session: Session | null;
   };
 
-  let { data } = $props<Props>();
-
+  let { data } = $props<{ data: PageData }>();
   let supabase = $state(data.supabase);
   let session = $state(data.session);
 
@@ -22,7 +20,7 @@
 
   onMount(() => {
     const { data: authData } = supabase.auth.onAuthStateChange(
-      (_: string, currentSession: Session | null) => {
+      (_event: string, currentSession: Session | null) => {
         if (currentSession?.expires_at !== session?.expires_at) {
           invalidate("supabase:auth");
         }

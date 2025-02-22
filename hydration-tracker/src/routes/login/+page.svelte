@@ -1,14 +1,18 @@
 <script lang="ts">
   import { enhance } from "$app/forms";
+  import type { SubmitFunction } from "@sveltejs/kit";
   import type { ActionData } from "./$types";
 
-  export let form: ActionData;
+  interface Props {
+    form: ActionData;
+  }
 
-  let loading = false;
+  let { form } = $props<Props>();
+  let loading = $state(false);
 
-  const handleSubmit = () => {
+  const handleSubmit: SubmitFunction = () => {
     loading = true;
-    return async ({ update }) => {
+    return async ({ update }: { update: () => Promise<void> }) => {
       loading = false;
       await update();
     };

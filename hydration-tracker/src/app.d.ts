@@ -2,6 +2,8 @@
 // for information about these interfaces
 import type { SupabaseClient, Session } from '@supabase/supabase-js';
 
+import type { SupabaseClient, Session } from '@supabase/supabase-js';
+
 declare global {
   namespace App {
     interface Locals {
@@ -14,16 +16,6 @@ declare global {
     }
     // interface Error {}
     // interface Platform {}
-  }
-}
-
-declare module '@sveltejs/kit' {
-  interface PageLoad {
-    session: Session | null;
-    supabase: SupabaseClient;
-  }
-  interface PageServerLoad {
-    session: Session | null;
   }
 }
 
