@@ -1,18 +1,30 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import { redirect } from "@sveltejs/kit";
+  import { goto } from "$app/navigation";
+
+  let error = $state<string | null>(null);
 
   $effect(() => {
+    const timeout = setTimeout(() => {
+      error = "Taking too long to load. Please refresh the page.";
+    }, 5000);
+
     if ($page.data.session) {
-      redirect(303, "/dashboard");
+      goto("/dashboard");
     } else {
-      redirect(303, "/login");
+      goto("/login");
     }
+
+    return () => clearTimeout(timeout);
   });
 </script>
 
 <div class="loading">
-  <p>Loading...</p>
+  {#if error}
+    <p class="error">{error}</p>
+  {:else}
+    <p>Loading...</p>
+  {/if}
 </div>
 
 <style>
@@ -21,5 +33,9 @@
     justify-content: center;
     align-items: center;
     height: 100vh;
+  }
+
+  .error {
+    color: red;
   }
 </style>
