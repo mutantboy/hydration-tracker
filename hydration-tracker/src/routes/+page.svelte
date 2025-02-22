@@ -1,11 +1,25 @@
 <script lang="ts">
   import { page } from "$app/stores";
-  import AuthForm from "$lib/AuthForm.svelte";
-  import HydrationTracker from "$lib/HydrationTracker.svelte";
+  import { redirect } from "@sveltejs/kit";
+
+  $effect(() => {
+    if ($page.data.session) {
+      redirect(303, "/dashboard");
+    } else {
+      redirect(303, "/login");
+    }
+  });
 </script>
 
-{#if !$page.data.session}
-  <AuthForm />
-{:else}
-  <HydrationTracker />
-{/if}
+<div class="loading">
+  <p>Loading...</p>
+</div>
+
+<style>
+  .loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+  }
+</style>
