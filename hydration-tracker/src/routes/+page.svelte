@@ -1,2 +1,11 @@
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation</p>
+<script>
+  import { page } from "$app/state";
+  //import AuthForm from "$lib/AuthForm.svelte";
+  //import HydrationTracker from "$lib/HydrationTracker.svelte";
+</script>
+
+<!-- {#if !$page.data.session}
+  <AuthForm />
+{:else}
+  <HydrationTracker />
+{/if} -->
