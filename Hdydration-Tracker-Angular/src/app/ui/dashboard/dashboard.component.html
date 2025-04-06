@@ -1,0 +1,105 @@
+<div class="dashboard-container">
+  <header>
+    <h1>Hydration Tracker</h1>
+    <div class="user-info">
+      <span *ngIf="supabaseService.profile()">
+        Welcome, {{ supabaseService.profile()?.email }}
+      </span>
+      <div class="actions">
+        <button class="btn profile-btn" routerLink="/profile">Profile</button>
+        <button
+          class="btn admin-btn"
+          *ngIf="supabaseService.isAdmin()"
+          routerLink="/admin"
+        >
+          Admin
+        </button>
+        <button class="btn logout-btn" (click)="signOut()">Sign Out</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="today-stats">
+      <h2>Today's Progress</h2>
+      <div class="water-container">
+        <div class="water-stats">
+          <div class="stat">
+            <span class="stat-value">{{ dailyTotal() }}</span>
+            <span class="stat-label">ml</span>
+          </div>
+          <div class="stat">
+            <span class="stat-value">{{ dailyPercentage() }}%</span>
+            <span class="stat-label">of daily goal</span>
+          </div>
+        </div>
+        <div class="water-level-container">
+          <div class="water-level" [style.height.%]="dailyPercentage()"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="add-entry">
+      <h2>Add Water</h2>
+      <div class="input-group">
+        <input
+          type="number"
+          [ngModel]="newAmount()"
+          (ngModelChange)="setNewAmount($event)"
+          placeholder="Amount in ml"
+          min="0"
+          class="amount-input"
+        />
+        <button
+          (click)="addEntry()"
+          [disabled]="supabaseService.loading() || newAmount() <= 0"
+          class="add-btn"
+        >
+          Add
+        </button>
+      </div>
+      <div class="quick-amounts">
+        <button class="quick-btn" (click)="setNewAmount(250)">250ml</button>
+        <button class="quick-btn" (click)="setNewAmount(500)">500ml</button>
+        <button class="quick-btn" (click)="setNewAmount(750)">750ml</button>
+      </div>
+    </section>
+
+    <section class="history">
+      <h2>History</h2>
+      <div *ngIf="supabaseService.loading()" class="loading">Loading...</div>
+      <table *ngIf="!supabaseService.loading() && entries().length > 0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Amount</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let entry of entries()">
+            <td>{{ entry.created_at | date : "MMM d, yyyy" }}</td>
+            <td>{{ entry.created_at | date : "h:mm a" }}</td>
+            <td>{{ entry.amount }} ml</td>
+            <td>
+              <button
+                class="delete-btn"
+                (click)="deleteEntry(entry.id)"
+                [disabled]="supabaseService.loading()"
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <div
+        *ngIf="!supabaseService.loading() && entries().length === 0"
+        class="empty-state"
+      >
+        No entries yet. Add your first water intake!
+      </div>
+    </section>
+  </main>
+</div>

@@ -1,0 +1,40 @@
+<div class="container">
+  <header>
+    <h1>Admin Dashboard</h1>
+    <button class="btn back-btn" routerLink="/dashboard">
+      Back to Dashboard
+    </button>
+  </header>
+
+  <div class="admin-card">
+    <h2>All User Hydration Entries</h2>
+
+    <div *ngIf="supabaseService.loading()" class="loading">Loading...</div>
+
+    <table *ngIf="!supabaseService.loading() && entries().length > 0">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let entry of entries()">
+          <td>{{ entry.profiles?.email }}</td>
+          <td>{{ entry.created_at | date : "MMM d, yyyy" }}</td>
+          <td>{{ entry.created_at | date : "h:mm a" }}</td>
+          <td>{{ entry.amount }} ml</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div
+      *ngIf="!supabaseService.loading() && entries().length === 0"
+      class="empty-state"
+    >
+      No entries found.
+    </div>
+  </div>
+</div>
