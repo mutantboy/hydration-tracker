@@ -67,8 +67,10 @@
 
     <section class="history">
       <h2>History</h2>
-      <div *ngIf="supabaseService.loading()" class="loading">Loading...</div>
-      <table *ngIf="!supabaseService.loading() && entries().length > 0">
+      <div *ngIf="loading()" class="loading-overlay">
+        <div class="loading-spinner">Loading your hydration data...</div>
+      </div>
+      <table *ngIf="!loading() && entries().length > 0">
         <thead>
           <tr>
             <th>Date</th>
@@ -86,7 +88,7 @@
               <button
                 class="delete-btn"
                 (click)="deleteEntry(entry.id)"
-                [disabled]="supabaseService.loading()"
+                [disabled]="loading()"
               >
                 Delete
               </button>
@@ -94,11 +96,11 @@
           </tr>
         </tbody>
       </table>
-      <div
-        *ngIf="!supabaseService.loading() && entries().length === 0"
-        class="empty-state"
-      >
-        No entries yet. Add your first water intake!
+      <div *ngIf="!loading() && entries().length === 0" class="empty-state">
+        <p>No entries yet. Add your first water intake!</p>
+        <button (click)="tryLoadEntries()" class="reload-btn">
+          Retry Loading Data
+        </button>
       </div>
     </section>
   </main>

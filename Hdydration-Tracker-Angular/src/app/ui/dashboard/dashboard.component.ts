@@ -1,4 +1,4 @@
-import { Component, OnInit, signal, computed, inject } from '@angular/core';
+import { Component, OnInit, signal, computed, inject, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
@@ -32,72 +32,53 @@ export class DashboardComponent implements OnInit {
 
   public supabaseService = inject(SupabaseService);
   public router = inject(Router);
-
-  private authSubscription: { data: { subscription: any } } | null = null;
-
   
-  constructor() {}
+  constructor() {
+    // Use effect to respond to authentication state changes
+    effect(() => {
+      console.log('Dashboard effect - checking login status:', this.supabaseService.isLoggedIn());
+      if (this.supabaseService.isLoggedIn()) {
+        this.tryLoadEntries();
+      }
+    });
+  }
 
   async ngOnInit() {
     console.log('Dashboard initializing...');
     this.loading.set(true);
     
-    if (!this.supabaseService.initialized()) {
-      console.log('Waiting for service initialization...');
-      let attempts = 0;
-      
-      while (!this.supabaseService.initialized() && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        attempts++;
+    // Start a timer to ensure data gets loaded even if other mechanisms fail
+    setTimeout(() => {
+      if (this.entries().length === 0 && this.supabaseService.isLoggedIn()) {
+        console.log('Trigger delayed entry loading');
+        this.tryLoadEntries();
       }
+    }, 3000);
+  }
+
+  async tryLoadEntries(force: boolean = false) {
+    console.log('Attempting to load entries...');
+    
+    if (this.entries().length > 0 && !force) {
+      console.log('Entries already loaded, skipping');
+      return;
     }
     
-    if (this.supabaseService.isLoggedIn()) {
-      if (!this.supabaseService.profile()) {
+    this.loading.set(true);
+    this.error.set(null);
+    
+    try {
+      if (this.supabaseService.isLoggedIn() && !this.supabaseService.profile()) {
         console.log('User logged in but no profile, loading profile...');
         await this.supabaseService.loadUserProfile(this.supabaseService.user()!.id);
       }
       
-      console.log('User authenticated, loading entries...');
-      await this.tryLoadEntries();
-    } else {
-      console.log('User not authenticated, redirecting to auth...');
-      this.router.navigate(['/auth']);
-    }
-    
-    this.authSubscription = this.supabaseService._supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log('Auth state changed:', event, !!session);
-        if (session) {
-          this.tryLoadEntries();
-        } else {
-          this.router.navigate(['/auth']);
-        }
+      if (!this.supabaseService.isLoggedIn()) {
+        console.warn('Not logged in when trying to load entries');
+        return;
       }
-    );
-  }
-  
-  ngOnDestroy() {
-    if (this.authSubscription?.data?.subscription) {
-      this.authSubscription.data.subscription.unsubscribe();
-    }
-  }
- 
-
-  async tryLoadEntries() {
-    this.loading.set(true);
-    this.error.set(null);
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    if (!this.supabaseService.isLoggedIn()) {
-      console.log('Not logged in, redirecting...');
-      this.router.navigate(['/auth']);
-      return;
-    }
-    
-    try {
-      console.log('Loading entries...');
+      
+      console.log('Loading entries from database...');
       const { data, error } = await this.supabaseService.getEntries();
       
       if (error) {
@@ -106,8 +87,8 @@ export class DashboardComponent implements OnInit {
         return;
       }
       
-      console.log('Entries loaded:', data?.length || 0);
-      this.entries.set(data as HydrationEntry[]);
+      console.log('Entries loaded successfully:', data?.length || 0);
+      this.entries.set(data as HydrationEntry[] || []);
     } catch (err: any) {
       console.error('Exception loading entries:', err);
       this.error.set(err.message || 'An unexpected error occurred');
@@ -124,28 +105,43 @@ export class DashboardComponent implements OnInit {
     if (this.newAmount() <= 0) return;
     
     try {
+      this.loading.set(true);
+      console.log('Adding new entry with amount:', this.newAmount());
+      
       const { error } = await this.supabaseService.createEntry(this.newAmount());
       
       if (error) throw error;
       
       this.newAmount.set(250); // Reset to default
-      await this.tryLoadEntries();
+      
+      await this.tryLoadEntries(true);
+      
+      console.log('Entry added successfully');
     } catch (error) {
       console.error('Error adding entry:', error);
       alert('Error adding entry');
+    } finally {
+      this.loading.set(false);
     }
   }
 
   async deleteEntry(id: number) {
     try {
+      this.loading.set(true);
+      console.log('Deleting entry with ID:', id);
+      
       const { error } = await this.supabaseService.deleteEntry(id);
       
       if (error) throw error;
       
-      await this.tryLoadEntries();
+      await this.tryLoadEntries(true);
+      
+      console.log('Entry deleted successfully');
     } catch (error) {
       console.error('Error deleting entry:', error);
       alert('Error deleting entry');
+    } finally {
+      this.loading.set(false);
     }
   }
 

@@ -204,44 +204,45 @@ private async initialize() {
     }
   }
 
-async refreshSession(session?: AuthSession): Promise<boolean> {
-  try {
-    this._loading.set(true);
-    
-    if (session) {
-      this._session.set(session);
-      this._user.set(session.user);
+  async refreshSession(session?: AuthSession): Promise<boolean> {
+    try {
+      this._loading.set(true);
       
-      if (session.user) {
-        await this.loadUserProfile(session.user.id);
+      if (session) {
+        console.log('Refreshing with provided session');
+        this._session.set(session);
+        this._user.set(session.user);
+        
+        if (session.user) {
+          await this.loadUserProfile(session.user.id);
+        }
+        
+        return true;
+      } else {
+        console.log('No session provided, attempting to get current session');
+        const { data, error } = await this.supabase.auth.getSession();
+        
+        if (error || !data.session) {
+          console.log('No active session found during refresh');
+          return false;
+        }
+        
+        this._session.set(data.session);
+        this._user.set(data.session.user);
+        
+        if (data.session.user) {
+          await this.loadUserProfile(data.session.user.id);
+        }
+        
+        return true;
       }
-      
-      return true;
-    } else {
-      const { data, error } = await this.supabase.auth.getSession();
-      
-      if (error || !data.session) {
-        console.log('No valid session found during refresh');
-        this.clearState();
-        return false;
-      }
-      
-      this._session.set(data.session);
-      this._user.set(data.session.user);
-      
-      if (data.session.user) {
-        await this.loadUserProfile(data.session.user.id);
-      }
-      
-      return true;
+    } catch (e) {
+      console.error('Error refreshing session:', e);
+      return false;
+    } finally {
+      this._loading.set(false);
     }
-  } catch (e) {
-    console.error('Error refreshing session:', e);
-    return false;
-  } finally {
-    this._loading.set(false);
   }
-}
 
   // Clear state
   private clearState() {
