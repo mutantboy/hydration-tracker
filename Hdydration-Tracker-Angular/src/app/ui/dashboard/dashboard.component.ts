@@ -4,8 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SupabaseService} from '../../data/services/supabase-service/supabase-service.service';
 import { HydrationEntry } from '../../data/model/entry';
-import { Router } from 'express';
-
+import { Router } from '@angular/router';
 @Component({
   selector: 'app-dashboard',
   standalone: true,

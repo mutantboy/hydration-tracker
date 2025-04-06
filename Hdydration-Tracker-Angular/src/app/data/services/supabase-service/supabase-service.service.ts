@@ -77,6 +77,8 @@ export class SupabaseService {
       if (data.session?.user) {
         await this.loadUserProfile(data.session.user.id);
       }
+      
+      console.log('Session loaded:', !!data.session);
     } catch (error) {
       console.error('Error loading session:', error);
     } finally {
