@@ -16,6 +16,8 @@ import { Router, RouterModule } from '@angular/router';
   styleUrl: './profile.component.css'
 })
 export class ProfileComponent implements OnInit {
+
+  
   passwordForm: FormGroup;
   errorMessage = signal<string | null>(null);
   successMessage = signal<string | null>(null);
@@ -23,6 +25,7 @@ export class ProfileComponent implements OnInit {
   private router = inject(Router);
   public supabaseService = inject(SupabaseService);
   private fb = inject(FormBuilder);
+  private loadingResetTimeout: any = null;
 
 
   constructor() {
@@ -64,6 +67,17 @@ export class ProfileComponent implements OnInit {
       return;
     }
     
+    // Clear any existing timeout
+    if (this.loadingResetTimeout) {
+      clearTimeout(this.loadingResetTimeout);
+    }
+    
+    // Set a safety timeout to reset loading state after 10 seconds
+    this.loadingResetTimeout = setTimeout(() => {
+      console.log('Safety timeout triggered to reset loading state');
+      this.supabaseService.loading = false;
+    }, 10000);
+    
     try {
       const { error } = await this.supabaseService.updatePassword(this.passwordForm.value.password);
       
@@ -71,8 +85,19 @@ export class ProfileComponent implements OnInit {
       
       this.successMessage.set('Password updated successfully!');
       this.passwordForm.reset();
+      
+      // Clear the safety timeout since we completed successfully
+      clearTimeout(this.loadingResetTimeout);
+      this.loadingResetTimeout = null;
     } catch (error: any) {
       this.errorMessage.set(error.message || 'An error occurred while updating your password');
+      
+      // Ensure loading state is reset on error
+      this.supabaseService.loading = false;
+      
+      // Clear the safety timeout
+      clearTimeout(this.loadingResetTimeout);
+      this.loadingResetTimeout = null;
     }
   }
 }

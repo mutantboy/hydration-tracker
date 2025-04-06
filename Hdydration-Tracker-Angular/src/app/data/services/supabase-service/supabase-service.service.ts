@@ -67,6 +67,10 @@ export class SupabaseService {
     return this._loading.asReadonly();
   }
 
+  set loading(loading: boolean) {
+    this._loading.set(loading);
+  }
+
   private async loadSession() {
     try {
       this._loading.set(true);
@@ -206,9 +210,14 @@ export class SupabaseService {
   async updatePassword(newPassword: string) {
     this._loading.set(true);
     try {
-      return await this.supabase.auth.updateUser({
+      const response = await this.supabase.auth.updateUser({
         password: newPassword
       });
+      
+      return response;
+    } catch (error) {
+      console.error('Error updating password:', error);
+      throw error;
     } finally {
       this._loading.set(false);
     }

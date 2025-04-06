@@ -39,30 +39,31 @@ export class UpdatePasswordComponent implements OnInit {
     return password === confirmPassword ? null : { passwordMismatch: true };
   }
 
+
   async handleSubmit() {
     this.errorMessage.set(null);
     this.successMessage.set(null);
-  
-  if (this.passwordForm.invalid) {
-    return;
-  }
-  
-  try {
-    const { error } = await this.supabaseService.updatePassword(this.passwordForm.value.password);
     
-    if (error) throw error;
+    if (this.passwordForm.invalid) {
+      return;
+    }
     
-    this.successMessage.set('Password updated successfully!');
-    this.passwordForm.reset();
-    
-    // Consider signing the user out after password change
-    // if that's your desired behavior
-    setTimeout(() => {
-      this.supabaseService.signOut();
-    }, 3000); // Give them 3 seconds to see the success message
-  } catch (error: any) {
-    this.errorMessage.set(error.message || 'An error occurred while updating your password');
-  }
+    try {
+      const { data, error } = await this.supabaseService.updatePassword(this.passwordForm.value.password);
+      
+      if (error) throw error;
+      
+      this.successMessage.set('Password updated successfully!');
+      this.passwordForm.reset();
+      
+      setTimeout(() => {
+        this.supabaseService.signOut().then(() => {
+          this.router.navigate(['/auth']);
+        });
+      }, 3000); 
+    } catch (error: any) {
+      this.errorMessage.set(error.message || 'An error occurred while updating your password');
+    }
   }
 }
 
