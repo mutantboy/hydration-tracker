@@ -73,36 +73,46 @@ export class SupabaseService {
     
     // Set up auth state change listener
     // In supabase-service.service.ts
-this.supabase.auth.onAuthStateChange(async (event, session) => {
-  console.log('Auth state change:', event, !!session);
-  
-  // Important: Don't process auth events during an active OAuth callback
-  const url = new URL(window.location.href);
-    if (url.pathname.includes('/auth/callback')) {
-      console.log('Ignoring auth state change during callback processing');
-      return;
-    }
-    
-    // Update session and user state
-    this._session.set(session);
-    this._user.set(session?.user || null);
-    
-    // Update profile if we have a user
-    if (session?.user) {
-      await this.loadUserProfile(session.user.id);
-    } else {
-      this._profile.set(null);
-    }
-    
-    // Handle authentication events
-    if (event === 'SIGNED_OUT') {
-      console.log('User signed out, redirecting to auth page');
-      this.router.navigate(['/auth']);
-    } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-      console.log('User signed in or token refreshed, redirecting to dashboard');
-      this.router.navigate(['/dashboard']);
-    }
-  });
+    this.supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, !!session);
+      
+      const url = new URL(window.location.href);
+      if (url.pathname.includes('/auth/callback')) {
+        if (event === 'SIGNED_IN' && session) { 
+          try {
+            await this.loadUserProfile(session.user.id);
+            this.router.navigate(['/dashboard']);
+          } catch (error) {
+            console.error('Error handling SIGNED_IN event:', error);
+            this.router.navigate(['/auth']);
+          }
+        } else if (!session) {
+          console.warn('SIGNED_IN event received without session');
+          this.router.navigate(['/auth']);
+        }
+        return;
+      }
+        
+        // Update session and user state
+        this._session.set(session);
+        this._user.set(session?.user || null);
+        
+        // Update profile if we have a user
+        if (session?.user) {
+          await this.loadUserProfile(session.user.id);
+        } else {
+          this._profile.set(null);
+        }
+        
+        // Handle authentication events
+        if (event === 'SIGNED_OUT') {
+          console.log('User signed out, redirecting to auth page');
+          this.router.navigate(['/auth']);
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          console.log('User signed in or token refreshed, redirecting to dashboard');
+          this.router.navigate(['/dashboard']);
+        }
+      });
   }
 
   // Public getters

@@ -74,6 +74,13 @@ async ngOnInit() {
 
   async tryLoadEntries(force: boolean = false) {
     console.log('Attempting to load entries...');
+    await new Promise(resolve => {
+      const check = () => {
+        if (this.supabaseService.initialized()) resolve(true);
+        else setTimeout(check, 100);
+      };
+      check();
+    });
     
     if (this.entries().length > 0 && !force) {
       console.log('Entries already loaded, skipping');
