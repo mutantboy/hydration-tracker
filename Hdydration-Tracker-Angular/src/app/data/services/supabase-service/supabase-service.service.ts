@@ -27,7 +27,15 @@ export class SupabaseService {
   public isAdmin = computed(() => this._profile()?.role === 'admin');
   
   constructor() {
-    this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey);
+    this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        storageKey: 'hydration-app-auth',
+        detectSessionInUrl: true,
+        flowType: 'pkce' //for OAuth
+      }
+    });
     
     this.loadSession();
     
@@ -95,54 +103,61 @@ export class SupabaseService {
   async signUp(email: string, password: string) {
     this._loading.set(true);
     try {
-      // Add retries for lock errors
-      const maxRetries = 3;
-      let attempt = 0;
+      console.log('Attempting signup with email:', email);
+      const response = await this.supabase.auth.signUp({
+        email,
+        password
+      });
       
-      while (attempt < maxRetries) {
-        try {
-          const { data, error } = await this.supabase.auth.signUp({
-            email,
-            password
-          });
-          
-          if (error) throw error;
-          return data;
-        } catch (e) {
-          // Check if it's a lock error
-          if (e instanceof Error && e.message.includes('lock')) {
-            console.warn(`Lock error on attempt ${attempt + 1}, retrying...`);
-            // Wait before retrying
-            await new Promise(resolve => setTimeout(resolve, 500));
-            attempt++;
-          } else {
-            // If it's not a lock error, rethrow
-            throw e;
-          }
-        }
+      const { data, error } = response;
+      
+      if (error) {
+        console.error('Signup API error:', error);
+        throw error;
       }
       
-      // If we've exhausted retries
-      throw new Error('Failed to acquire authentication lock after multiple attempts');
+      //console.log('Signup response data:', JSON.stringify(data, null, 2));
+      
+      if (data?.user && !data?.session) {
+        console.log('User created but no session - likely needs email confirmation');
+      }
+      
+      return data;
+    } catch (e) {
+      console.error('Signup exception:', e);
+      throw e;
     } finally {
       this._loading.set(false);
     }
   }
   // Email/Password Sign In
-  async signInWithEmail(email: string, password: string) {
-    this._loading.set(true);
-    try {
-      const { data, error } = await this.supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-      
-      if (error) throw error;
-      return data;
-    } finally {
-      this._loading.set(false);
+ async signInWithEmail(email: string, password: string) {
+  this._loading.set(true);
+  try {
+    console.log('Starting sign in with:', email);
+    const response = await this.supabase.auth.signInWithPassword({
+      email,
+      password
+    });
+    
+    const { data, error } = response;
+    
+    if (error) {
+      console.error('Sign in error:', error);
+      throw error;
     }
+    
+    console.log('Sign in successful, session:', data.session);
+    console.log('Sign in successful, user:', data.user);
+    
+    return data;
+  } catch (error) {
+    console.error('Sign in exception:', error);
+    throw error;
+  } finally {
+    this._loading.set(false);
   }
+}
 
   // Google OAuth sign in
   async signInWithGoogle() {

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { SupabaseService} from '../../data/services/supabase-service/supabase-service.service';
 import { HydrationEntry } from '../../data/model/entry';
+import { Router } from 'express';
 
 @Component({
   selector: 'app-dashboard',
@@ -29,7 +30,7 @@ export class DashboardComponent implements OnInit {
   });
 
   public supabaseService = inject(SupabaseService);      // public so we can use it in the template
-
+  public router = inject(Router);
   
   constructor() {}
 
@@ -82,7 +83,14 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  signOut() {
-    this.supabaseService.signOut();
+  async signOut() {
+    try {
+      await this.supabaseService.signOut();
+      
+      // Force navigation to auth page
+      this.router.navigate(['/auth'], { replaceUrl: true });
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   }
 }

@@ -30,6 +30,9 @@ export class AuthComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.authForm.reset();
+    //this.supabaseService.loading = false;
+
     // Check if user is already logged in
     if (this.supabaseService.isLoggedIn()) {
       this.router.navigate(['/dashboard']);
@@ -61,16 +64,42 @@ export class AuthComponent implements OnInit {
   }
 
   async handleSignUp(email: string, password: string) {
-    const error = await this.supabaseService.signUp(email, password);
-    if (error) throw error;
-    this.successMessage.set('Registration successful! Please check your email to verify your account.');
-    this.authMode.set('signin');
+    try {
+      const result = await this.supabaseService.signUp(email, password);
+      
+      // Check if user was created but verification is pending
+      if (result?.user && !result.session) {
+        this.successMessage.set('Registration successful! Please check your email to verify your account before signing in.');
+        this.authMode.set('signin');
+        return;
+      }
+      
+      // Regular success case
+      this.successMessage.set('Registration successful!');
+      this.authMode.set('signin');
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      this.errorMessage.set(error.message || 'An error occurred during registration');
+    }
   }
 
   async handleSignIn(email: string, password: string) {
-    const error = await this.supabaseService.signInWithEmail(email, password);
-    if (error) throw error;
-    this.router.navigate(['/dashboard']);
+    try {
+      console.log('Handling sign in for:', email);
+      const result = await this.supabaseService.signInWithEmail(email, password);
+      
+      if (!result?.user || !result?.session) {
+        console.error('Sign in failed - no user or session returned');
+        this.errorMessage.set('Sign in failed - no user or session returned');
+        return;
+      }
+      
+      console.log('Sign in successful, redirecting to dashboard');
+      this.router.navigate(['/dashboard']);
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      this.errorMessage.set(error.message || 'An error occurred while signing in');
+    }
   }
 
   async handlePasswordReset(email: string) {
@@ -92,6 +121,19 @@ export class AuthComponent implements OnInit {
     this.authMode.set(mode);
     this.errorMessage.set(null);
     this.successMessage.set(null);
-    this.authForm.reset();
+    
+    // Delay form rebuilding to give Angular time to detect changes
+    setTimeout(() => {
+      if (mode === 'reset') {
+        this.authForm = this.fb.group({
+          email: ['', [Validators.required, Validators.email]]
+        });
+      } else {
+        this.authForm = this.fb.group({
+          email: ['', [Validators.required, Validators.email]],
+          password: ['', [Validators.required, Validators.minLength(6)]]
+        });
+      }
+    }, 0);
   }
 }

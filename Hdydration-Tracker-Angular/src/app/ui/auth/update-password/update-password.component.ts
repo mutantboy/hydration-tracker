@@ -12,6 +12,8 @@ import { Router } from '@angular/router';
 export class UpdatePasswordComponent implements OnInit {
   passwordForm: FormGroup;
   errorMessage = signal<string | null>(null);
+  successMessage = signal<string | null>(null);
+
 
   private fb = inject(FormBuilder);
   public supabaseService = inject(SupabaseService);
@@ -39,23 +41,28 @@ export class UpdatePasswordComponent implements OnInit {
 
   async handleSubmit() {
     this.errorMessage.set(null);
+    this.successMessage.set(null);
+  
+  if (this.passwordForm.invalid) {
+    return;
+  }
+  
+  try {
+    const { error } = await this.supabaseService.updatePassword(this.passwordForm.value.password);
     
-    if (this.passwordForm.invalid) {
-      return;
-    }
+    if (error) throw error;
     
-    try {
-      const { error } = await this.supabaseService.updatePassword(this.passwordForm.value.password);
-      
-      if (error) throw error;
-      
-      await this.supabaseService.signOut();
-      this.router.navigate(['/auth'], { 
-        queryParams: { message: 'Password updated successfully. Please sign in with your new password.' }
-      });
-    } catch (error: any) {
-      this.errorMessage.set(error.message || 'An error occurred while updating your password');
-    }
+    this.successMessage.set('Password updated successfully!');
+    this.passwordForm.reset();
+    
+    // Consider signing the user out after password change
+    // if that's your desired behavior
+    setTimeout(() => {
+      this.supabaseService.signOut();
+    }, 3000); // Give them 3 seconds to see the success message
+  } catch (error: any) {
+    this.errorMessage.set(error.message || 'An error occurred while updating your password');
+  }
   }
 }
 
