@@ -9,4 +9,8 @@ import { RouterOutlet } from '@angular/router';
 })
 export class AppComponent {
   title = 'Hdydration-Tracker-Angular';
+
+  constructor() {
+    console.log('AppComponent initialized');
+  }
 }

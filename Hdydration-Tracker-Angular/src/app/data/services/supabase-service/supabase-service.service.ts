@@ -95,18 +95,39 @@ export class SupabaseService {
   async signUp(email: string, password: string) {
     this._loading.set(true);
     try {
-      const { data, error } = await this.supabase.auth.signUp({
-        email,
-        password
-      });
+      // Add retries for lock errors
+      const maxRetries = 3;
+      let attempt = 0;
       
-      if (error) throw error;
-      return data;
+      while (attempt < maxRetries) {
+        try {
+          const { data, error } = await this.supabase.auth.signUp({
+            email,
+            password
+          });
+          
+          if (error) throw error;
+          return data;
+        } catch (e) {
+          // Check if it's a lock error
+          if (e instanceof Error && e.message.includes('lock')) {
+            console.warn(`Lock error on attempt ${attempt + 1}, retrying...`);
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempt++;
+          } else {
+            // If it's not a lock error, rethrow
+            throw e;
+          }
+        }
+      }
+      
+      // If we've exhausted retries
+      throw new Error('Failed to acquire authentication lock after multiple attempts');
     } finally {
       this._loading.set(false);
     }
   }
-
   // Email/Password Sign In
   async signInWithEmail(email: string, password: string) {
     this._loading.set(true);

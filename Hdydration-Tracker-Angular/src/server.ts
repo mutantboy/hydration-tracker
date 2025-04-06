@@ -1,4 +1,4 @@
-import {
+/*import {
   AngularNodeAppEngine,
   createNodeRequestHandler,
   isMainModule,
@@ -28,7 +28,7 @@ const angularApp = new AngularNodeAppEngine();
 
 /**
  * Serve static files from /browser
- */
+ *
 app.use(
   express.static(browserDistFolder, {
     maxAge: '1y',
@@ -39,7 +39,7 @@ app.use(
 
 /**
  * Handle all other requests by rendering the Angular application.
- */
+ *
 app.use('/**', (req, res, next) => {
   angularApp
     .handle(req)
@@ -52,7 +52,7 @@ app.use('/**', (req, res, next) => {
 /**
  * Start the server if this module is the main entry point.
  * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
- */
+ *
 if (isMainModule(import.meta.url)) {
   const port = process.env['PORT'] || 4000;
   app.listen(port, () => {
@@ -62,5 +62,7 @@ if (isMainModule(import.meta.url)) {
 
 /**
  * The request handler used by the Angular CLI (dev-server and during build).
- */
+ *
 export const reqHandler = createNodeRequestHandler(app);
+
+*/

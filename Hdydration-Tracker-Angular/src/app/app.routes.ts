@@ -1,12 +1,14 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './data/guards/auth.guard';
 import { adminGuard } from './data/guards/admin.guard';
+import { AuthComponent } from './ui/auth/auth.component';
 
 export const routes: Routes = [
     {
-      path: '',
-      redirectTo: 'dashboard',
-      pathMatch: 'full'
+        path: '',
+        redirectTo: '/auth',
+        pathMatch: 'full'
+        //component: AuthComponent
     },
     {
       path: 'auth',
@@ -37,6 +39,6 @@ export const routes: Routes = [
     },
     {
       path: '**',
-      redirectTo: 'dashboard'
+      redirectTo: '/dashboard'
     }
   ];
