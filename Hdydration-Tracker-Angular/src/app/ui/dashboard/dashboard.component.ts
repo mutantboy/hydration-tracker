@@ -50,26 +50,41 @@ async ngOnInit() {
   console.log('Dashboard initializing...');
   this.loading.set(true);
   
-  const { data } = await this.supabaseService._supabase.auth.getSession();
-  if (data.session) {
-    console.log('Valid session detected in dashboard');
-    
-    if (!this.supabaseService.profile()) {
-      await this.supabaseService.loadUserProfile(data.session.user.id);
+  try {
+    console.log('Waiting for SupabaseService to be initialized...');
+    if (!this.supabaseService.initialized()) {
+      await new Promise<void>(resolve => {
+        const checkInterval = setInterval(() => {
+          if (this.supabaseService.initialized()) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+      });
     }
     
-    this.tryLoadEntries();
-  } else {
-    console.log('No valid session in dashboard');
-    this.router.navigate(['/auth']);
-  }
-  
-  setTimeout(() => {
-    if (this.entries().length === 0 && this.loading()) {
-      console.log('Attempting delayed entry loading');
+    console.log('SupabaseService initialized, checking session...');
+    const { data } = await this.supabaseService._supabase.auth.getSession();
+    
+    if (data.session) {
+      console.log('Valid session detected in dashboard');
+      
+      if (!this.supabaseService.profile()) {
+        console.log('Loading user profile...');
+        await this.supabaseService.loadUserProfile(data.session.user.id);
+      }
+      
+      console.log('Loading entries...');
       this.tryLoadEntries();
+    } else {
+      console.log('No valid session in dashboard');
+      this.router.navigate(['/auth']);
     }
-  }, 2000);
+  } catch (error) {
+    console.error('Error in dashboard initialization:', error);
+  } finally {
+    this.loading.set(false);
+  }
 }
 
   async tryLoadEntries(force: boolean = false) {

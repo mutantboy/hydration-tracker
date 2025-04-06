@@ -38,19 +38,17 @@ export class AuthCallbackComponent implements OnInit {
     console.log('Auth callback component initialized');
     
     try {
-      // Simple redirect approach - let Supabase SDK handle everything
       console.log('Redirecting to dashboard after brief delay');
       
-      // Delay to ensure browser completes any processing
       setTimeout(() => {
         this.message = 'Authentication complete! Redirecting...';
-        window.location.href = '/dashboard';
+        this.router.navigate(['/dashboard']);
       }, 2000);
     } catch (error) {
       console.error('Error in auth callback:', error);
       this.message = 'An error occurred during authentication. Redirecting...';
       setTimeout(() => {
-        window.location.href = '/auth';
+        this.router.navigate(['/auth']);
       }, 2000);
     }
   }

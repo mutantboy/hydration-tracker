@@ -159,13 +159,12 @@ private async initialize() {
     }
     
     if (data.session) {
-      console.log('Session found during initialization');
+      console.log('Session found during initialization:', data.session.user.id);
       this._session.set(data.session);
       this._user.set(data.session.user);
       
-      this.loadUserProfile(data.session.user.id).then(() => {
-        console.log('Profile loaded during initialization');
-      });
+      await this.loadUserProfile(data.session.user.id);
+      console.log('Profile loaded during initialization:', this._profile());
     } else {
       console.log('No active session during initialization');
     }
