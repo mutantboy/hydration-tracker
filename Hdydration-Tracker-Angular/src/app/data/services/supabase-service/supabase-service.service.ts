@@ -136,48 +136,34 @@ this.supabase.auth.onAuthStateChange(async (event, session) => {
 
   // Initialize the service and get the current session
 private async initialize() {
-  this._loading.set(true);
   try {
+    this._loading.set(true);
     console.log('Initializing SupabaseService');
     
-    const { data, error } = await this.supabase.auth.refreshSession();
+    const { data, error } = await this.supabase.auth.getSession();
     
     if (error) {
-      console.log('No active session found or error refreshing', error?.message);
-      const sessionResult = await this.supabase.auth.getSession();
-      if (sessionResult.error || !sessionResult.data.session) {
-        console.log('No active session available');
-        this.clearState();
-        this._initialized.set(true);
-        this._loading.set(false);
-        return;
-      }
-      
-      console.log('Session retrieved from getSession');
-      this._session.set(sessionResult.data.session);
-      this._user.set(sessionResult.data.session.user);
-    } else {
-      console.log('Session refreshed successfully');
+      console.error('Error getting session:', error);
+      this._initialized.set(true);
+      return;
+    }
+    
+    if (data.session) {
+      console.log('Session found during initialization');
       this._session.set(data.session);
-      this._user.set(data.session?.user || null);
+      this._user.set(data.session.user);
+      
+      this.loadUserProfile(data.session.user.id).then(() => {
+        console.log('Profile loaded during initialization');
+      });
+    } else {
+      console.log('No active session during initialization');
     }
-    
-    if (this._user()) {
-      try {
-        console.log('Loading user profile...');
-        const profileData = await this.loadUserProfile(this._user()!.id);
-        console.log('Profile loaded:', !!profileData);
-      } catch (e) {
-        console.error('Error loading profile:', e);
-      }
-    }
-    
-  } catch (e) {
-    console.error('Fatal error during initialization:', e);
-    this.clearState();
+  } catch (error) {
+    console.error('Error during initialization:', error);
   } finally {
-    this._loading.set(false);
     this._initialized.set(true);
+    this._loading.set(false);
     console.log('Service initialization complete. Logged in:', this.isLoggedIn());
   }
 }
@@ -417,16 +403,17 @@ async updatePassword(newPassword: string) {
   async createEntry(amount: number) {
     const userId = this._user()?.id;
     if (!userId) throw new Error('User not authenticated');
-
+  
     this._loading.set(true);
     try {
       const entry = {
         user_id: userId,
         amount,
-        created_at: new Date(),
+        created_at: new Date().toISOString(), 
       };
       
-      return await this.supabase.from('hydration_entries').insert(entry);
+      const result = await this.supabase.from('hydration_entries').insert(entry).select().single();
+      return result; 
     } finally {
       this._loading.set(false);
     }

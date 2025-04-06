@@ -43,18 +43,31 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  async ngOnInit() {
-    console.log('Dashboard initializing...');
-    this.loading.set(true);
+async ngOnInit() {
+  console.log('Dashboard initializing...');
+  this.loading.set(true);
+  
+  const { data } = await this.supabaseService._supabase.auth.getSession();
+  if (data.session) {
+    console.log('Valid session detected in dashboard');
     
-    // Start a timer to ensure data gets loaded even if other mechanisms fail
-    setTimeout(() => {
-      if (this.entries().length === 0 && this.supabaseService.isLoggedIn()) {
-        console.log('Trigger delayed entry loading');
-        this.tryLoadEntries();
-      }
-    }, 3000);
+    if (!this.supabaseService.profile()) {
+      await this.supabaseService.loadUserProfile(data.session.user.id);
+    }
+    
+    this.tryLoadEntries();
+  } else {
+    console.log('No valid session in dashboard');
+    this.router.navigate(['/auth']);
   }
+  
+  setTimeout(() => {
+    if (this.entries().length === 0 && this.loading()) {
+      console.log('Attempting delayed entry loading');
+      this.tryLoadEntries();
+    }
+  }, 2000);
+}
 
   async tryLoadEntries(force: boolean = false) {
     console.log('Attempting to load entries...');
@@ -108,14 +121,16 @@ export class DashboardComponent implements OnInit {
       this.loading.set(true);
       console.log('Adding new entry with amount:', this.newAmount());
       
-      const { error } = await this.supabaseService.createEntry(this.newAmount());
+      const { data, error } = await this.supabaseService.createEntry(this.newAmount());
       
       if (error) throw error;
       
+      if (data) {
+        console.log('Entry created, updating entries list');
+        this.entries.update(currentEntries => [data as HydrationEntry, ...currentEntries]);
+      }
+      
       this.newAmount.set(250); // Reset to default
-      
-      await this.tryLoadEntries(true);
-      
       console.log('Entry added successfully');
     } catch (error) {
       console.error('Error adding entry:', error);
@@ -134,7 +149,9 @@ export class DashboardComponent implements OnInit {
       
       if (error) throw error;
       
-      await this.tryLoadEntries(true);
+      this.entries.update(currentEntries => 
+        currentEntries.filter(entry => entry.id !== id)
+      );
       
       console.log('Entry deleted successfully');
     } catch (error) {

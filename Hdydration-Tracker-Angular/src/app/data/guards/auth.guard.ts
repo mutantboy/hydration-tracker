@@ -8,47 +8,31 @@ export const authGuard: CanActivateFn = async (route, state) => {
 
   console.log('Auth guard executing, checking authentication...');
 
-  if (!supabaseService.initialized()) {
-    console.log('Auth guard waiting for initialization');
-    let attempts = 0;
-    
-    while (!supabaseService.initialized() && attempts < 20) {
-      await new Promise(resolve => setTimeout(resolve, 150));
-      attempts++;
-    }
-    
-    if (!supabaseService.initialized()) {
-      console.log('Service initialization timed out');
-    }
+  if (supabaseService.isLoggedIn()) {
+    console.log('Already logged in, proceeding');
+    return true;
   }
 
-  try {
-    // Try to refresh the session if possible
-    console.log('Auth guard checking and refreshing session...');
-    const { data, error } = await supabaseService._supabase.auth.getSession();
+  if (!supabaseService.initialized()) {
+    console.log('Auth guard waiting for initialization');
     
-    if (error) {
-      console.error('Error getting session in auth guard:', error);
-      router.navigate(['/auth']);
-      return false;
+    const { data } = await supabaseService._supabase.auth.getSession();
+    
+    if (data.session) {
+      console.log('Found valid session, proceeding');
+      return true;
     }
     
-    if (!data.session) {
-      console.log('Auth guard: No active session found');
-      router.navigate(['/auth']);
-      return false;
-    }
-    
-    if (!supabaseService.session()) {
-      console.log('Auth guard: Session found but not in service, updating service state');
-      await supabaseService.refreshSession(data.session);
-    }
-    
-    console.log('Auth guard: User is authenticated');
-    return true;
-  } catch (e) {
-    console.error('Auth guard exception:', e);
+    console.log('No session found during guard check');
     router.navigate(['/auth']);
     return false;
   }
+
+  if (!supabaseService.isLoggedIn()) {
+    console.log('Auth guard: not logged in, redirecting to auth');
+    router.navigate(['/auth']);
+    return false;
+  }
+  
+  return true;
 };
