@@ -11,8 +11,18 @@ export const authGuard: CanActivateFn = async (route, state) => {
   }
 
   if (!supabaseService.isLoggedIn()) {
+    console.log('Auth guard: Not logged in, redirecting to auth');
     router.navigate(['/auth']);
     return false;
+  }
+  
+  if (!supabaseService.profile() && supabaseService.user()) {
+    console.log('Auth guard: Missing profile, attempting to load');
+    try {
+      await supabaseService.loadUserProfile(supabaseService.user()!.id);
+    } catch (error) {
+      console.error('Failed to load profile in guard:', error);
+    }
   }
   
   return true;

@@ -70,23 +70,37 @@ export class SupabaseService {
   private async loadSession() {
     try {
       this._loading.set(true);
-      const { data } = await this.supabase.auth.getSession();
-      this._session.set(data.session);
-      this._user.set(data.session?.user || null);
+      const { data, error } = await this.supabase.auth.getSession();
       
-      if (data.session?.user) {
+      if (error) {
+        console.error('Session retrieval error:', error);
+        this.clearState();
+        return;
+      }
+      
+      if (!data.session) {
+        console.log('No active session found');
+        this.clearState();
+        return;
+      }
+      
+      this._session.set(data.session);
+      this._user.set(data.session.user || null);
+      
+      if (data.session.user) {
         await this.loadUserProfile(data.session.user.id);
       }
       
-      console.log('Session loaded:', !!data.session);
+      console.log('Session loaded successfully:', !!data.session);
     } catch (error) {
       console.error('Error loading session:', error);
+      this.clearState();
     } finally {
       this._loading.set(false);
     }
   }
 
-  private async loadUserProfile(userId: string) {
+  public async loadUserProfile(userId: string) {
     try {
       const { data, error } = await this.supabase
         .from('profiles')
@@ -205,11 +219,25 @@ export class SupabaseService {
     return this.supabase.auth.getSession();
   }
 
-  // Sign out
+  private clearState() {
+    this._session.set(null);
+    this._user.set(null);
+    this._profile.set(null);
+
+    localStorage.clear();
+    sessionStorage.clear();
+  }
+  
   async signOut() {
     this._loading.set(true);
     try {
-      return await this.supabase.auth.signOut();
+      const { error } = await this.supabase.auth.signOut();
+      if (error) throw error;
+      this.clearState();
+      return { error: null };
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      return { error };
     } finally {
       this._loading.set(false);
     }

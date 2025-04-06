@@ -30,7 +30,7 @@ export class AuthComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.authForm.reset();
+    this.resetAuthForm();
     //this.supabaseService.loading = false;
 
     // Check if user is already logged in
@@ -117,23 +117,32 @@ export class AuthComponent implements OnInit {
     }
   }
 
-  switchMode(mode: 'signup' | 'signin' | 'reset') {
-    this.authMode.set(mode);
+  resetAuthForm() {
+    // Create a fresh form
+    if (this.authMode() === 'reset') {
+      this.authForm = this.fb.group({
+        email: ['', [Validators.required, Validators.email]]
+      });
+    } else {
+      this.authForm = this.fb.group({
+        email: ['', [Validators.required, Validators.email]],
+        password: ['', [Validators.required, Validators.minLength(6)]]
+      });
+    }
+  
+    // Reset messages
     this.errorMessage.set(null);
     this.successMessage.set(null);
     
-    // Delay form rebuilding to give Angular time to detect changes
+    // Force form validation to run on the next tick
     setTimeout(() => {
-      if (mode === 'reset') {
-        this.authForm = this.fb.group({
-          email: ['', [Validators.required, Validators.email]]
-        });
-      } else {
-        this.authForm = this.fb.group({
-          email: ['', [Validators.required, Validators.email]],
-          password: ['', [Validators.required, Validators.minLength(6)]]
-        });
-      }
+      this.authForm.updateValueAndValidity();
     }, 0);
+  }
+  
+
+  switchMode(mode: 'signup' | 'signin' | 'reset') {
+    this.authMode.set(mode);
+    this.resetAuthForm();
   }
 }
