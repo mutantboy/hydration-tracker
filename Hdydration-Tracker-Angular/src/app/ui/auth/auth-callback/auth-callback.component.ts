@@ -80,7 +80,6 @@ export class AuthCallbackComponent implements OnInit {
 
   async handleRedirect() {
     try {
-      // Get the URL params
       const url = new URL(window.location.href);
       const code = url.searchParams.get('code');
       
@@ -91,46 +90,29 @@ export class AuthCallbackComponent implements OnInit {
         return;
       }
       
-      console.log('Processing OAuth callback with code:', code);
+      this.statusMessage = 'Processing authentication...';
       
-      // First check if we're already logged in
-      const { data: sessionData } = await this.supabaseService._supabase.auth.getSession();
-      if (sessionData?.session) {
-        console.log('Already have a session, redirecting to dashboard');
-        this.statusMessage = 'Already authenticated! Redirecting...';
-        setTimeout(() => this.router.navigate(['/dashboard']), 1500);
+      const { data, error } = await this.supabaseService._supabase.auth.exchangeCodeForSession(code);
+      
+      if (error) {
+        console.error('Error during authentication:', error);
+        this.statusMessage = 'Authentication error: ' + error.message;
+        setTimeout(() => this.router.navigate(['/auth']), 2000);
         return;
       }
       
-      this.statusMessage = 'Exchanging code for session...';
+      console.log('Authentication successful!');
+      this.statusMessage = 'Authentication successful! Redirecting...';
       
-      try {
-        // Exchange code for session
-        const { data, error } = await this.supabaseService._supabase.auth.exchangeCodeForSession(code);
-        
-        if (error) {
-          console.error('Error exchanging code for session:', error);
-          this.statusMessage = 'Authentication error: ' + error.message;
-          setTimeout(() => this.router.navigate(['/auth']), 2000);
-          return;
-        }
-        
-        console.log('Session established:', !!data.session);
-        this.statusMessage = 'Authentication successful! Redirecting...';
-        
-        // Force a window reload to ensure the new auth state is fully recognized
-        window.location.href = '/dashboard';
-      } catch (err) {
-        console.error('Exception during code exchange:', err);
-        this.statusMessage = 'An unexpected error occurred during authentication';
-        setTimeout(() => this.router.navigate(['/auth']), 2000);
-      }
+      // Use window.location for a hard refresh to ensure clean state
+      window.location.href = '/dashboard';
     } catch (error) {
-      console.error('Error handling auth redirect:', error);
       this.statusMessage = 'Authentication process failed';
       setTimeout(() => this.router.navigate(['/auth']), 2000);
     }
   }
+
+  
 
   // Manual redirect button for when automatic redirect fails
   manualRedirect() {

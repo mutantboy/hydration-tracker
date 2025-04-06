@@ -38,11 +38,32 @@ export class DashboardComponent implements OnInit {
   
   constructor() {}
 
-  ngOnInit() {
+  async ngOnInit() {
     console.log('Dashboard initializing...');
     this.loading.set(true);
     
-    this.tryLoadEntries();
+    if (!this.supabaseService.initialized()) {
+      console.log('Waiting for service initialization...');
+      let attempts = 0;
+      
+      while (!this.supabaseService.initialized() && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        attempts++;
+      }
+    }
+    
+    if (this.supabaseService.isLoggedIn()) {
+      if (!this.supabaseService.profile()) {
+        console.log('User logged in but no profile, loading profile...');
+        await this.supabaseService.loadUserProfile(this.supabaseService.user()!.id);
+      }
+      
+      console.log('User authenticated, loading entries...');
+      await this.tryLoadEntries();
+    } else {
+      console.log('User not authenticated, redirecting to auth...');
+      this.router.navigate(['/auth']);
+    }
     
     this.authSubscription = this.supabaseService._supabase.auth.onAuthStateChange(
       (event, session) => {

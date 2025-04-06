@@ -105,7 +105,7 @@ export class SupabaseService {
       this._loading.set(true);
       console.log('Initializing SupabaseService');
       
-      // Get current session
+      // Get current session with refresh
       const { data, error } = await this.supabase.auth.getSession();
       
       if (error) {
@@ -121,6 +121,7 @@ export class SupabaseService {
       // Update profile if we have a user
       if (data.session?.user) {
         await this.loadUserProfile(data.session.user.id);
+        console.log('Profile loaded:', !!this._profile());
       }
       
       console.log('Service initialized, user logged in:', !!data.session);
@@ -228,10 +229,17 @@ export class SupabaseService {
   async signInWithGoogle() {
     this._loading.set(true);
     try {
+      const redirectUrl = new URL('/auth/callback', window.location.origin).href;
+      console.log('Redirecting OAuth to:', redirectUrl);
+      
       return await this.supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent'
+          }
         }
       });
     } finally {
