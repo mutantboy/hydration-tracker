@@ -31,6 +31,33 @@ export class SupabaseService {
   public isAdmin = computed(() => this._profile()?.role === 'admin');
   
   constructor() {
+    const storageKey = 'hydration-app-auth';
+  
+    const customStorage = {
+      getItem: (key: string) => {
+        try {
+          return localStorage.getItem(key);
+        } catch (error) {
+          console.error('Error accessing localStorage:', error);
+          return null;
+        }
+      },
+      setItem: (key: string, value: string) => {
+        try {
+          localStorage.setItem(key, value);
+        } catch (error) {
+          console.error('Error writing to localStorage:', error);
+        }
+      },
+      removeItem: (key: string) => {
+        try {
+          localStorage.removeItem(key);
+        } catch (error) {
+          console.error('Error removing from localStorage:', error);
+        }
+      }
+    };
+
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
       auth: {
         autoRefreshToken: true,
@@ -45,29 +72,37 @@ export class SupabaseService {
     this.initialize();
     
     // Set up auth state change listener
-    this.supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, !!session);
-      
-      // Update session and user state
-      this._session.set(session);
-      this._user.set(session?.user || null);
-      
-      // Update profile if we have a user
-      if (session?.user) {
-        await this.loadUserProfile(session.user.id);
-      } else {
-        this._profile.set(null);
-      }
-      
-      // Handle authentication events
-      if (event === 'SIGNED_OUT') {
-        console.log('User signed out, redirecting to auth page');
-        this.router.navigate(['/auth']);
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        console.log('User signed in or token refreshed, redirecting to dashboard');
-        this.router.navigate(['/dashboard']);
-      }
-    });
+    // In supabase-service.service.ts
+this.supabase.auth.onAuthStateChange(async (event, session) => {
+  console.log('Auth state change:', event, !!session);
+  
+  // Important: Don't process auth events during an active OAuth callback
+  const url = new URL(window.location.href);
+    if (url.pathname.includes('/auth/callback')) {
+      console.log('Ignoring auth state change during callback processing');
+      return;
+    }
+    
+    // Update session and user state
+    this._session.set(session);
+    this._user.set(session?.user || null);
+    
+    // Update profile if we have a user
+    if (session?.user) {
+      await this.loadUserProfile(session.user.id);
+    } else {
+      this._profile.set(null);
+    }
+    
+    // Handle authentication events
+    if (event === 'SIGNED_OUT') {
+      console.log('User signed out, redirecting to auth page');
+      this.router.navigate(['/auth']);
+    } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      console.log('User signed in or token refreshed, redirecting to dashboard');
+      this.router.navigate(['/dashboard']);
+    }
+  });
   }
 
   // Public getters
@@ -100,39 +135,52 @@ export class SupabaseService {
   }
 
   // Initialize the service and get the current session
-  private async initialize() {
-    try {
-      this._loading.set(true);
-      console.log('Initializing SupabaseService');
-      
-      // Get current session with refresh
-      const { data, error } = await this.supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error getting session:', error);
+private async initialize() {
+  this._loading.set(true);
+  try {
+    console.log('Initializing SupabaseService');
+    
+    const { data, error } = await this.supabase.auth.refreshSession();
+    
+    if (error) {
+      console.log('No active session found or error refreshing', error?.message);
+      const sessionResult = await this.supabase.auth.getSession();
+      if (sessionResult.error || !sessionResult.data.session) {
+        console.log('No active session available');
         this.clearState();
+        this._initialized.set(true);
+        this._loading.set(false);
         return;
       }
       
-      // Update session and user state
+      console.log('Session retrieved from getSession');
+      this._session.set(sessionResult.data.session);
+      this._user.set(sessionResult.data.session.user);
+    } else {
+      console.log('Session refreshed successfully');
       this._session.set(data.session);
       this._user.set(data.session?.user || null);
-      
-      // Update profile if we have a user
-      if (data.session?.user) {
-        await this.loadUserProfile(data.session.user.id);
-        console.log('Profile loaded:', !!this._profile());
-      }
-      
-      console.log('Service initialized, user logged in:', !!data.session);
-    } catch (error) {
-      console.error('Error initializing service:', error);
-      this.clearState();
-    } finally {
-      this._loading.set(false);
-      this._initialized.set(true);
     }
+    
+    if (this._user()) {
+      try {
+        console.log('Loading user profile...');
+        const profileData = await this.loadUserProfile(this._user()!.id);
+        console.log('Profile loaded:', !!profileData);
+      } catch (e) {
+        console.error('Error loading profile:', e);
+      }
+    }
+    
+  } catch (e) {
+    console.error('Fatal error during initialization:', e);
+    this.clearState();
+  } finally {
+    this._loading.set(false);
+    this._initialized.set(true);
+    console.log('Service initialization complete. Logged in:', this.isLoggedIn());
   }
+}
 
   // Load user profile
   public async loadUserProfile(userId: string) {
@@ -155,6 +203,45 @@ export class SupabaseService {
       return null;
     }
   }
+
+async refreshSession(session?: AuthSession): Promise<boolean> {
+  try {
+    this._loading.set(true);
+    
+    if (session) {
+      this._session.set(session);
+      this._user.set(session.user);
+      
+      if (session.user) {
+        await this.loadUserProfile(session.user.id);
+      }
+      
+      return true;
+    } else {
+      const { data, error } = await this.supabase.auth.getSession();
+      
+      if (error || !data.session) {
+        console.log('No valid session found during refresh');
+        this.clearState();
+        return false;
+      }
+      
+      this._session.set(data.session);
+      this._user.set(data.session.user);
+      
+      if (data.session.user) {
+        await this.loadUserProfile(data.session.user.id);
+      }
+      
+      return true;
+    }
+  } catch (e) {
+    console.error('Error refreshing session:', e);
+    return false;
+  } finally {
+    this._loading.set(false);
+  }
+}
 
   // Clear state
   private clearState() {
@@ -229,19 +316,25 @@ export class SupabaseService {
   async signInWithGoogle() {
     this._loading.set(true);
     try {
-      const redirectUrl = new URL('/auth/callback', window.location.origin).href;
-      console.log('Redirecting OAuth to:', redirectUrl);
+      console.log('Starting Google sign-in flow');
       
-      return await this.supabase.auth.signInWithOAuth({
+      // Let Supabase handle the entire OAuth flow
+      const { data, error } = await this.supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectUrl,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent'
-          }
+          redirectTo: `${window.location.origin}/auth/callback`
         }
       });
+      
+      if (error) {
+        console.error('Error starting Google OAuth flow:', error);
+        throw error;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('Exception during Google sign-in:', error);
+      throw error;
     } finally {
       this._loading.set(false);
     }

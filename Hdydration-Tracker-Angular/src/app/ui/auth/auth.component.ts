@@ -142,7 +142,7 @@ export class AuthComponent implements OnInit {
 
   async signInWithGoogle() {
     try {
-      const { error } = await this.supabaseService.signInWithGoogle();
+      const error  = await this.supabaseService.signInWithGoogle();
       if (error) throw error;
     } catch (error: any) {
       this.errorMessage.set(error.message || 'Error signing in with Google');
