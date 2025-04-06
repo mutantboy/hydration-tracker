@@ -105,3 +105,26 @@
     </section>
   </main>
 </div>
+
+<!-- Add this at the bottom of your dashboard.component.html -->
+<div
+  style="
+    margin-top: 30px;
+    padding: 15px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #eee;
+  "
+>
+  <h3>Debug Information</h3>
+  <p>Loading: {{ loading() }}</p>
+  <p>Session: {{ supabaseService.isLoggedIn() ? "Valid" : "None" }}</p>
+  <p>User: {{ supabaseService.user()?.email || "Not available" }}</p>
+  <p>Entries Count: {{ entries().length }}</p>
+  <button
+    (click)="tryLoadEntries(true)"
+    style="margin-top: 10px; padding: 5px 10px"
+  >
+    Force Reload Entries
+  </button>
+</div>

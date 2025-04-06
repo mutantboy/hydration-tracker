@@ -22,7 +22,10 @@ export class DashboardComponent implements OnInit {
   dailyTotal = computed(() => {
     const today = new Date().toISOString().split('T')[0];
     return this.entries()
-      .filter(entry => new Date(entry.created_at).toISOString().split('T')[0] === today)
+      .filter(entry => {
+        const entryDate = new Date(entry.created_at).toISOString().split('T')[0];
+        return entryDate === today;
+      })
       .reduce((sum, entry) => sum + entry.amount, 0);
   });
   
