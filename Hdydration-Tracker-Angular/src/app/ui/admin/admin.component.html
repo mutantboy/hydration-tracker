@@ -9,7 +9,9 @@
   <div class="admin-card">
     <h2>All User Hydration Entries</h2>
 
-    <div *ngIf="supabaseService.loading()" class="loading">Loading...</div>
+    <div *ngIf="supabaseService.loading()" class="loading-overlay">
+      <div class="loading-spinner">Loading...</div>
+    </div>
 
     <table *ngIf="!supabaseService.loading() && entries().length > 0">
       <thead>

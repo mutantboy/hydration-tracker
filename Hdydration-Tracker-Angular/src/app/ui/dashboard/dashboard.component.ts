@@ -1,10 +1,11 @@
 import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { SupabaseService} from '../../data/services/supabase-service/supabase-service.service';
 import { HydrationEntry } from '../../data/model/entry';
-import { Router } from '@angular/router';
+import { Subscription } from '@supabase/supabase-js';
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -14,9 +15,10 @@ import { Router } from '@angular/router';
 })
 export class DashboardComponent implements OnInit {
   entries = signal<HydrationEntry[]>([]);
-  newAmount = signal<number>(0);
+  newAmount = signal<number>(250); // Default to 250ml
+  loading = signal<boolean>(true);
+  error = signal<string | null>(null);
   
-  // Computed values
   dailyTotal = computed(() => {
     const today = new Date().toISOString().split('T')[0];
     return this.entries()
@@ -28,24 +30,68 @@ export class DashboardComponent implements OnInit {
     return Math.min(Math.round(this.dailyTotal() / 2500 * 100), 100);
   });
 
-  public supabaseService = inject(SupabaseService);      // public so we can use it in the template
+  public supabaseService = inject(SupabaseService);
   public router = inject(Router);
+
+  private authSubscription: { data: { subscription: any } } | null = null;
+
   
   constructor() {}
 
   ngOnInit() {
-    this.loadEntries();
+    console.log('Dashboard initializing...');
+    this.loading.set(true);
+    
+    this.tryLoadEntries();
+    
+    this.authSubscription = this.supabaseService._supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log('Auth state changed:', event, !!session);
+        if (session) {
+          this.tryLoadEntries();
+        } else {
+          this.router.navigate(['/auth']);
+        }
+      }
+    );
   }
+  
+  ngOnDestroy() {
+    if (this.authSubscription?.data?.subscription) {
+      this.authSubscription.data.subscription.unsubscribe();
+    }
+  }
+ 
 
-  async loadEntries() {
+  async tryLoadEntries() {
+    this.loading.set(true);
+    this.error.set(null);
+    
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    if (!this.supabaseService.isLoggedIn()) {
+      console.log('Not logged in, redirecting...');
+      this.router.navigate(['/auth']);
+      return;
+    }
+    
     try {
+      console.log('Loading entries...');
       const { data, error } = await this.supabaseService.getEntries();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading entries:', error);
+        this.error.set(error.message || 'Failed to load entries');
+        return;
+      }
       
+      console.log('Entries loaded:', data?.length || 0);
       this.entries.set(data as HydrationEntry[]);
-    } catch (error) {
-      console.error('Error loading entries:', error);
+    } catch (err: any) {
+      console.error('Exception loading entries:', err);
+      this.error.set(err.message || 'An unexpected error occurred');
+    } finally {
+      this.loading.set(false);
     }
   }
 
@@ -61,8 +107,8 @@ export class DashboardComponent implements OnInit {
       
       if (error) throw error;
       
-      this.newAmount.set(0);
-      await this.loadEntries();
+      this.newAmount.set(250); // Reset to default
+      await this.tryLoadEntries();
     } catch (error) {
       console.error('Error adding entry:', error);
       alert('Error adding entry');
@@ -75,7 +121,7 @@ export class DashboardComponent implements OnInit {
       
       if (error) throw error;
       
-      await this.loadEntries();
+      await this.tryLoadEntries();
     } catch (error) {
       console.error('Error deleting entry:', error);
       alert('Error deleting entry');
@@ -85,11 +131,9 @@ export class DashboardComponent implements OnInit {
   async signOut() {
     try {
       await this.supabaseService.signOut();
-      
-      // Force navigation to auth page
-      this.router.navigate(['/auth'], { replaceUrl: true });
     } catch (error) {
       console.error('Error signing out:', error);
+      this.router.navigate(['/auth']);
     }
   }
 }

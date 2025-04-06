@@ -71,7 +71,9 @@
           <ng-container *ngSwitchCase="'signin'">Sign In</ng-container>
           <ng-container *ngSwitchCase="'reset'">Send Reset Link</ng-container>
         </ng-container>
-        <span *ngIf="supabaseService.loading()">...</span>
+        <div *ngIf="supabaseService.loading()" class="loading-overlay">
+          <div class="loading-spinner">Loading...</div>
+        </div>
       </button>
     </form>
 

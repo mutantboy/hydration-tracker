@@ -1,4 +1,4 @@
-import { Injectable, Signal, signal, computed } from '@angular/core';
+import { Injectable, Signal, signal, computed, inject, booleanAttribute } from '@angular/core';
 import {
   AuthChangeEvent,
   AuthSession,
@@ -6,23 +6,27 @@ import {
   Session,
   SupabaseClient,
   User,
-  Provider
 } from '@supabase/supabase-js';
 import { environment } from '../../../../environments/environment';
 import { Profile } from '../../model/profile';
 import { HydrationEntry } from '../../model/entry';
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root'
 })
 export class SupabaseService {
   private supabase: SupabaseClient;
+  private router = inject(Router);
   
+  // State signals
   private _session = signal<AuthSession | null>(null);
   private _user = signal<User | null>(null);
   private _profile = signal<Profile | null>(null);
   private _loading = signal<boolean>(false);
+  private _initialized = signal<boolean>(false);
 
+  // Computed values
   public isLoggedIn = computed(() => !!this._session());
   public isAdmin = computed(() => this._profile()?.role === 'admin');
   
@@ -37,18 +41,38 @@ export class SupabaseService {
       }
     });
     
-    this.loadSession();
+    // Initialize the service
+    this.initialize();
     
+    // Set up auth state change listener
     this.supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change:', event, !!session);
+      
+      // Update session and user state
       this._session.set(session);
       this._user.set(session?.user || null);
       
+      // Update profile if we have a user
       if (session?.user) {
         await this.loadUserProfile(session.user.id);
       } else {
         this._profile.set(null);
       }
+      
+      // Handle authentication events
+      if (event === 'SIGNED_OUT') {
+        console.log('User signed out, redirecting to auth page');
+        this.router.navigate(['/auth']);
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        console.log('User signed in or token refreshed, redirecting to dashboard');
+        this.router.navigate(['/dashboard']);
+      }
     });
+  }
+
+  // Public getters
+  get _supabase(): SupabaseClient {
+    return this.supabase;
   }
 
   get session(): Signal<AuthSession | null> {
@@ -67,43 +91,49 @@ export class SupabaseService {
     return this._loading.asReadonly();
   }
 
+  get initialized(): Signal<boolean> {
+    return this._initialized.asReadonly();
+  }
+
   set loading(loading: boolean) {
     this._loading.set(loading);
   }
 
-  private async loadSession() {
+  // Initialize the service and get the current session
+  private async initialize() {
     try {
       this._loading.set(true);
+      console.log('Initializing SupabaseService');
+      
+      // Get current session
       const { data, error } = await this.supabase.auth.getSession();
       
       if (error) {
-        console.error('Session retrieval error:', error);
+        console.error('Error getting session:', error);
         this.clearState();
         return;
       }
       
-      if (!data.session) {
-        console.log('No active session found');
-        this.clearState();
-        return;
-      }
-      
+      // Update session and user state
       this._session.set(data.session);
-      this._user.set(data.session.user || null);
+      this._user.set(data.session?.user || null);
       
-      if (data.session.user) {
+      // Update profile if we have a user
+      if (data.session?.user) {
         await this.loadUserProfile(data.session.user.id);
       }
       
-      console.log('Session loaded successfully:', !!data.session);
+      console.log('Service initialized, user logged in:', !!data.session);
     } catch (error) {
-      console.error('Error loading session:', error);
+      console.error('Error initializing service:', error);
       this.clearState();
     } finally {
       this._loading.set(false);
+      this._initialized.set(true);
     }
   }
 
+  // Load user profile
   public async loadUserProfile(userId: string) {
     try {
       const { data, error } = await this.supabase
@@ -112,11 +142,28 @@ export class SupabaseService {
         .eq('id', userId)
         .single();
         
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading profile:', error);
+        throw error;
+      }
+      
       this._profile.set(data as Profile);
+      return data;
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      console.error('Exception loading profile:', error);
+      return null;
     }
+  }
+
+  // Clear state
+  private clearState() {
+    console.log('Clearing authentication state');
+    this._session.set(null);
+    this._user.set(null);
+    this._profile.set(null);
+
+    localStorage.clear();
+    sessionStorage.clear();
   }
 
   // Email/Password Sign Up
@@ -136,8 +183,6 @@ export class SupabaseService {
         throw error;
       }
       
-      //console.log('Signup response data:', JSON.stringify(data, null, 2));
-      
       if (data?.user && !data?.session) {
         console.log('User created but no session - likely needs email confirmation');
       }
@@ -150,34 +195,34 @@ export class SupabaseService {
       this._loading.set(false);
     }
   }
+
   // Email/Password Sign In
- async signInWithEmail(email: string, password: string) {
-  this._loading.set(true);
-  try {
-    console.log('Starting sign in with:', email);
-    const response = await this.supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    
-    const { data, error } = response;
-    
-    if (error) {
-      console.error('Sign in error:', error);
+  async signInWithEmail(email: string, password: string) {
+    this._loading.set(true);
+    try {
+      console.log('Starting sign in with:', email);
+      const response = await this.supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      const { data, error } = response;
+      
+      if (error) {
+        console.error('Sign in error:', error);
+        throw error;
+      }
+      
+      console.log('Sign in successful');
+      
+      return data;
+    } catch (error) {
+      console.error('Sign in exception:', error);
       throw error;
+    } finally {
+      this._loading.set(false);
     }
-    
-    console.log('Sign in successful, session:', data.session);
-    console.log('Sign in successful, user:', data.user);
-    
-    return data;
-  } catch (error) {
-    console.error('Sign in exception:', error);
-    throw error;
-  } finally {
-    this._loading.set(false);
   }
-}
 
   // Google OAuth sign in
   async signInWithGoogle() {
@@ -207,14 +252,22 @@ export class SupabaseService {
   }
 
   // Update password
-  async updatePassword(newPassword: string) {
-    this._loading.set(true);
-    try {
-      const response = await this.supabase.auth.updateUser({
-        password: newPassword
-      });
-      
-      return response;
+  // Update password
+async updatePassword(newPassword: string) {
+  this._loading.set(true);
+  try {
+    console.log('Updating password...');
+    const result = await this.supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    console.log('Password update result:', result.error ? 'Error' : 'Success');
+    
+    if (result.error) {
+      throw result.error;
+    }
+    
+    return result;
     } catch (error) {
       console.error('Error updating password:', error);
       throw error;
@@ -228,24 +281,30 @@ export class SupabaseService {
     return this.supabase.auth.getSession();
   }
 
-  private clearState() {
-    this._session.set(null);
-    this._user.set(null);
-    this._profile.set(null);
-
-    localStorage.clear();
-    sessionStorage.clear();
-  }
-  
+  // Sign out
   async signOut() {
     this._loading.set(true);
     try {
+      console.log('Signing out user');
+      
+      // Clear local storage first to ensure clean state
+      localStorage.removeItem('hydration-app-auth');
+      sessionStorage.removeItem('hydration-app-auth');
+      
+      // Sign out from Supabase
       const { error } = await this.supabase.auth.signOut();
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Error during sign out:', error);
+        throw error;
+      }
+      
+      // Clear local state
       this.clearState();
-      return { error: null };
+      
+      return { success: true };
     } catch (error) {
-      console.error('Error during sign out:', error);
+      console.error('Exception during sign out:', error);
       return { error };
     } finally {
       this._loading.set(false);
@@ -329,6 +388,10 @@ export class SupabaseService {
 
   // Admin: Get all users' entries
   async getAllEntries() {
+    if (!this.isAdmin()) {
+      throw new Error('Unauthorized - Admin privileges required');
+    }
+    
     this._loading.set(true);
     try {
       return await this.supabase

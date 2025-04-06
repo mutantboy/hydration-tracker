@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -14,7 +14,7 @@ import { SupabaseService } from '../../data/services/supabase-service/supabase-s
 })
 export class AuthComponent implements OnInit {
   authMode = signal<'signup' | 'signin' | 'reset'>('signin');
-  authForm: FormGroup;
+  authForm!: FormGroup; // Will be initialized in ngOnInit
   errorMessage = signal<string | null>(null);
   successMessage = signal<string | null>(null);
 
@@ -23,19 +23,54 @@ export class AuthComponent implements OnInit {
   private router = inject(Router);
   
   constructor() {
-    this.authForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]]
+    effect(() => {
+      if (this.supabaseService.isLoggedIn()) {
+        console.log('Already logged in, redirecting to dashboard');
+        this.router.navigate(['/dashboard']);
+      }
     });
   }
 
   ngOnInit() {
-    this.resetAuthForm();
-    //this.supabaseService.loading = false;
-
-    // Check if user is already logged in
+    this.buildForm();
+    
+    this.clearStaleAuthData();
+    
     if (this.supabaseService.isLoggedIn()) {
+      console.log('Already logged in, redirecting to dashboard');
       this.router.navigate(['/dashboard']);
+    }
+  }
+  
+  buildForm() {
+    if (this.authMode() === 'reset') {
+      this.authForm = this.fb.group({
+        email: ['', [Validators.required, Validators.email]]
+      });
+    } else {
+      this.authForm = this.fb.group({
+        email: ['', [Validators.required, Validators.email]],
+        password: ['', [Validators.required, Validators.minLength(6)]]
+      });
+    }
+  }
+  
+  clearStaleAuthData() {
+    const keys = Object.keys(localStorage);
+    for (const key of keys) {
+      if (key.includes('supabase') || key.includes('hydration-app-auth')) {
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || '{}');
+          const expiry = data.expires_at || 0;
+          
+          if (expiry && expiry < Date.now() / 1000) {
+            console.log('Clearing expired auth data:', key);
+            localStorage.removeItem(key);
+          }
+        } catch (e) {
+          localStorage.removeItem(key);
+        }
+      }
     }
   }
 
@@ -67,16 +102,14 @@ export class AuthComponent implements OnInit {
     try {
       const result = await this.supabaseService.signUp(email, password);
       
-      // Check if user was created but verification is pending
       if (result?.user && !result.session) {
         this.successMessage.set('Registration successful! Please check your email to verify your account before signing in.');
         this.authMode.set('signin');
         return;
       }
       
-      // Regular success case
       this.successMessage.set('Registration successful!');
-      this.authMode.set('signin');
+      
     } catch (error: any) {
       console.error('Signup error:', error);
       this.errorMessage.set(error.message || 'An error occurred during registration');
@@ -95,7 +128,6 @@ export class AuthComponent implements OnInit {
       }
       
       console.log('Sign in successful, redirecting to dashboard');
-      this.router.navigate(['/dashboard']);
     } catch (error: any) {
       console.error('Sign in error:', error);
       this.errorMessage.set(error.message || 'An error occurred while signing in');
@@ -117,32 +149,10 @@ export class AuthComponent implements OnInit {
     }
   }
 
-  resetAuthForm() {
-    // Create a fresh form
-    if (this.authMode() === 'reset') {
-      this.authForm = this.fb.group({
-        email: ['', [Validators.required, Validators.email]]
-      });
-    } else {
-      this.authForm = this.fb.group({
-        email: ['', [Validators.required, Validators.email]],
-        password: ['', [Validators.required, Validators.minLength(6)]]
-      });
-    }
-  
-    // Reset messages
-    this.errorMessage.set(null);
-    this.successMessage.set(null);
-    
-    // Force form validation to run on the next tick
-    setTimeout(() => {
-      this.authForm.updateValueAndValidity();
-    }, 0);
-  }
-  
-
   switchMode(mode: 'signup' | 'signin' | 'reset') {
     this.authMode.set(mode);
-    this.resetAuthForm();
+    this.errorMessage.set(null);
+    this.successMessage.set(null);
+    this.buildForm();
   }
 }

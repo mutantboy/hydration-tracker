@@ -34,6 +34,15 @@
 
     <div class="divider"></div>
 
+    <button
+      type="button"
+      class="btn back-btn"
+      (click)="forceSignOut()"
+      style="margin-left: 10px"
+    >
+      Sign Out
+    </button>
+
     <h2>Change Password</h2>
     <form
       [formGroup]="passwordForm"
@@ -81,7 +90,9 @@
         [disabled]="passwordForm.invalid || supabaseService.loading()"
       >
         Update Password
-        <span *ngIf="supabaseService.loading()">...</span>
+        <div *ngIf="supabaseService.loading()" class="loading-overlay">
+          <div class="loading-spinner">Loading...</div>
+        </div>
       </button>
     </form>
   </div>
