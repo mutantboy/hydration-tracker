@@ -1,10 +1,9 @@
-import { Component, OnInit, signal, computed, inject, effect } from '@angular/core';
+import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, Router } from '@angular/router';
-import { SupabaseService} from '../../data/services/supabase-service/supabase-service.service';
+import { SupabaseService } from '../../data/services/supabase-service/supabase-service.service';
 import { HydrationEntry } from '../../data/model/entry';
-import { Subscription } from '@supabase/supabase-js';
 
 @Component({
   selector: 'app-dashboard',
@@ -15,10 +14,12 @@ import { Subscription } from '@supabase/supabase-js';
 })
 export class DashboardComponent implements OnInit {
   entries = signal<HydrationEntry[]>([]);
-  newAmount = signal<number>(250); // Default to 250ml
+  newAmount = signal<number>(250);
   loading = signal<boolean>(true);
-  error = signal<string | null>(null);
   
+  public supabaseService = inject(SupabaseService);
+  public router = inject(Router);
+
   dailyTotal = computed(() => {
     const today = new Date().toISOString().split('T')[0];
     return this.entries()
@@ -33,110 +34,31 @@ export class DashboardComponent implements OnInit {
     return Math.min(Math.round(this.dailyTotal() / 2500 * 100), 100);
   });
 
-  public supabaseService = inject(SupabaseService);
-  public router = inject(Router);
-  
-  constructor() {
-    // Use effect to respond to authentication state changes
-    effect(() => {
-      console.log('Dashboard effect - checking login status:', this.supabaseService.isLoggedIn());
-      if (this.supabaseService.isLoggedIn()) {
-        this.tryLoadEntries();
-      }
-    });
-  }
-
-async ngOnInit() {
-  console.log('Dashboard initializing...');
-  this.loading.set(true);
-  
-  try {
-    console.log('Waiting for SupabaseService to be initialized...');
-    if (!this.supabaseService.initialized()) {
-      await new Promise<void>(resolve => {
-        const checkInterval = setInterval(() => {
-          if (this.supabaseService.initialized()) {
-            clearInterval(checkInterval);
-            resolve();
-          }
-        }, 100);
-      });
-    }
-    
-    console.log('SupabaseService initialized, checking session...');
-    const { data } = await this.supabaseService._supabase.auth.getSession();
-    
-    if (data.session) {
-      console.log('Valid session detected in dashboard');
-      
-      if (!this.supabaseService.profile()) {
-        console.log('Loading user profile...');
-        await this.supabaseService.loadUserProfile(data.session.user.id);
-      }
-      
-      console.log('Loading entries...');
-      this.tryLoadEntries();
-    } else {
-      console.log('No valid session in dashboard');
+  async ngOnInit() {
+    // Ensure user is logged in
+    if (!this.supabaseService.isLoggedIn()) {
       this.router.navigate(['/auth']);
-    }
-  } catch (error) {
-    console.error('Error in dashboard initialization:', error);
-  } finally {
-    this.loading.set(false);
-  }
-}
-
-  async tryLoadEntries(force: boolean = false) {
-    console.log('Attempting to load entries...');
-    await new Promise(resolve => {
-      const check = () => {
-        if (this.supabaseService.initialized()) resolve(true);
-        else setTimeout(check, 100);
-      };
-      check();
-    });
-    
-    if (this.entries().length > 0 && !force) {
-      console.log('Entries already loaded, skipping');
       return;
     }
-    
-    this.loading.set(true);
-    this.error.set(null);
-    
+
+    // Load entries
+    await this.loadEntries();
+  }
+
+  async loadEntries() {
     try {
-      if (this.supabaseService.isLoggedIn() && !this.supabaseService.profile()) {
-        console.log('User logged in but no profile, loading profile...');
-        await this.supabaseService.loadUserProfile(this.supabaseService.user()!.id);
-      }
-      
-      if (!this.supabaseService.isLoggedIn()) {
-        console.warn('Not logged in when trying to load entries');
-        return;
-      }
-      
-      console.log('Loading entries from database...');
+      this.loading.set(true);
       const { data, error } = await this.supabaseService.getEntries();
       
-      if (error) {
-        console.error('Error loading entries:', error);
-        this.error.set(error.message || 'Failed to load entries');
-        return;
-      }
+      if (error) throw error;
       
-      console.log('Entries loaded successfully:', data?.length || 0);
-      this.entries.set(data as HydrationEntry[] || []);
-    } catch (err: any) {
-      console.error('Exception loading entries:', err);
-      this.error.set(err.message || 'An unexpected error occurred');
+      this.entries.set(data as HydrationEntry[]);
+    } catch (error) {
+      console.error('Error loading entries:', error);
+      // Optionally show an error message to the user
     } finally {
       this.loading.set(false);
     }
-  }
-
-  setNewAmount(amount: number) {
-    this.newAmount.set(amount);
   }
 
   async addEntry() {
@@ -144,22 +66,17 @@ async ngOnInit() {
     
     try {
       this.loading.set(true);
-      console.log('Adding new entry with amount:', this.newAmount());
-      
       const { data, error } = await this.supabaseService.createEntry(this.newAmount());
       
       if (error) throw error;
       
       if (data) {
-        console.log('Entry created, updating entries list');
         this.entries.update(currentEntries => [data as HydrationEntry, ...currentEntries]);
       }
       
-      this.newAmount.set(250); // Reset to default
-      console.log('Entry added successfully');
+      this.newAmount.set(250);
     } catch (error) {
       console.error('Error adding entry:', error);
-      alert('Error adding entry');
     } finally {
       this.loading.set(false);
     }
@@ -168,8 +85,6 @@ async ngOnInit() {
   async deleteEntry(id: number) {
     try {
       this.loading.set(true);
-      console.log('Deleting entry with ID:', id);
-      
       const { error } = await this.supabaseService.deleteEntry(id);
       
       if (error) throw error;
@@ -177,22 +92,14 @@ async ngOnInit() {
       this.entries.update(currentEntries => 
         currentEntries.filter(entry => entry.id !== id)
       );
-      
-      console.log('Entry deleted successfully');
     } catch (error) {
       console.error('Error deleting entry:', error);
-      alert('Error deleting entry');
     } finally {
       this.loading.set(false);
     }
   }
 
   async signOut() {
-    try {
-      await this.supabaseService.signOut();
-    } catch (error) {
-      console.error('Error signing out:', error);
-      this.router.navigate(['/auth']);
-    }
+    await this.supabaseService.signOut();
   }
 }

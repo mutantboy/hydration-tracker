@@ -45,7 +45,7 @@
         <input
           type="number"
           [ngModel]="newAmount()"
-          (ngModelChange)="setNewAmount($event)"
+          (ngModelChange)="addEntry()"
           placeholder="Amount in ml"
           min="0"
           class="amount-input"
@@ -59,9 +59,9 @@
         </button>
       </div>
       <div class="quick-amounts">
-        <button class="quick-btn" (click)="setNewAmount(250)">250ml</button>
-        <button class="quick-btn" (click)="setNewAmount(500)">500ml</button>
-        <button class="quick-btn" (click)="setNewAmount(750)">750ml</button>
+        <button class="quick-btn" (click)="addEntry()">250ml</button>
+        <button class="quick-btn" (click)="addEntry()">500ml</button>
+        <button class="quick-btn" (click)="addEntry()">750ml</button>
       </div>
     </section>
 
@@ -98,7 +98,7 @@
       </table>
       <div *ngIf="!loading() && entries().length === 0" class="empty-state">
         <p>No entries yet. Add your first water intake!</p>
-        <button (click)="tryLoadEntries()" class="reload-btn">
+        <button (click)="loadEntries()" class="reload-btn">
           Retry Loading Data
         </button>
       </div>
@@ -121,10 +121,7 @@
   <p>Session: {{ supabaseService.isLoggedIn() ? "Valid" : "None" }}</p>
   <p>User: {{ supabaseService.user()?.email || "Not available" }}</p>
   <p>Entries Count: {{ entries().length }}</p>
-  <button
-    (click)="tryLoadEntries(true)"
-    style="margin-top: 10px; padding: 5px 10px"
-  >
+  <button (click)="loadEntries()" style="margin-top: 10px; padding: 5px 10px">
     Force Reload Entries
   </button>
 </div>

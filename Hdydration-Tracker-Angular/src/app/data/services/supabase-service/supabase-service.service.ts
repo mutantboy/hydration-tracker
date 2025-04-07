@@ -25,103 +25,43 @@ export class SupabaseService {
   private _profile = signal<Profile | null>(null);
   private _loading = signal<boolean>(false);
   private _initialized = signal<boolean>(false);
+  private _authAttempted = signal<boolean>(false);
+
 
   // Computed values
   public isLoggedIn = computed(() => !!this._session());
   public isAdmin = computed(() => this._profile()?.role === 'admin');
   
   constructor() {
-    const storageKey = 'hydration-app-auth';
-  
-    const customStorage = {
-      getItem: (key: string) => {
-        try {
-          return localStorage.getItem(key);
-        } catch (error) {
-          console.error('Error accessing localStorage:', error);
-          return null;
-        }
-      },
-      setItem: (key: string, value: string) => {
-        try {
-          localStorage.setItem(key, value);
-        } catch (error) {
-          console.error('Error writing to localStorage:', error);
-        }
-      },
-      removeItem: (key: string) => {
-        try {
-          localStorage.removeItem(key);
-        } catch (error) {
-          console.error('Error removing from localStorage:', error);
-        }
-      }
-    };
-
+    // Simplified Supabase client creation
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
       auth: {
-        autoRefreshToken: true,
         persistSession: true,
-        storageKey: 'hydration-app-auth',
-        detectSessionInUrl: true,
-        flowType: 'pkce' //for OAuth
+        autoRefreshToken: true,
+        detectSessionInUrl: true
       }
     });
     
-    // Initialize the service
-    this.initialize();
-    this.handleRedirectIfNeeded();
-    
-    // Set up auth state change listener
-    // In supabase-service.service.ts
-    this.supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state change:', event, !!session);
+    // Simple auth state change listener
+    this.supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth State Change:', event);
       
-      // For OAuth callback handling
-      const url = new URL(window.location.href);
-      if (url.pathname.includes('/auth/callback')) {
-        console.log('Auth callback path detected during auth state change');
-        
-        if (event === 'SIGNED_IN' && session) { 
-          try {
-            console.log('SIGNED_IN event in callback, user ID:', session.user.id);
-            this._session.set(session);
-            this._user.set(session.user);
-            
-            await this.loadUserProfile(session.user.id);
-            console.log('Profile loaded in callback:', this._profile());
-            
-            // Don't navigate here, let the callback component handle it
-          } catch (error) {
-            console.error('Error handling SIGNED_IN event in callback:', error);
-          }
-        }
-        return; // Exit early for callback path
-      }
-      
-      // For normal auth state changes (not in callback path)
-      console.log('Normal auth state change (not in callback):', event);
-      
-      // Update session and user state
-      this._session.set(session);
-      this._user.set(session?.user || null);
-      
-      // Update profile if we have a user
-      if (session?.user) {
-        await this.loadUserProfile(session.user.id);
-      } else {
+      if (event === 'SIGNED_IN' && session) {
+        this._session.set(session);
+        this._user.set(session.user);
+        this.loadUserProfile(session.user.id)
+          .then(() => this.router.navigate(['/dashboard']))
+          .catch(console.error);
+      } else if (event === 'SIGNED_OUT') {
+        this._session.set(null);
+        this._user.set(null);
         this._profile.set(null);
-      }
-      
-      // Handle authentication events
-      if (event === 'SIGNED_OUT') {
-        console.log('User signed out, redirecting to auth page');
         this.router.navigate(['/auth']);
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        console.log('User signed in or token refreshed, redirecting to dashboard');
-        this.router.navigate(['/dashboard']);
       }
     });
+
+    // Try to get existing session on service initialization
+    this.initialize();
   }
 
   // Public getters
@@ -149,6 +89,10 @@ export class SupabaseService {
     return this._initialized.asReadonly();
   }
 
+  get authAttempted(): Signal<boolean> {
+    return this._authAttempted.asReadonly();
+  }
+
   set loading(loading: boolean) {
     this._loading.set(loading);
   }
@@ -164,41 +108,19 @@ export class SupabaseService {
   // Initialize the service and get the current session
   private async initialize() {
     try {
-      this._loading.set(true);
-      console.log('Initializing SupabaseService');
-      
-      localStorage.removeItem('sb-' + environment.supabaseUrl.replace(/^https?:\/\//, '') + '-auth-token');
-      
-      const { data, error } = await this.supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error getting session:', error);
-        this._initialized.set(true);
-        return;
-      }
-      
-      if (data?.session) {
-        console.log('Session found during initialization:', data.session.user.id);
+      const { data } = await this.supabase.auth.getSession();
+      if (data.session) {
         this._session.set(data.session);
         this._user.set(data.session.user);
-        
-        try {
-          const profile = await this.loadUserProfile(data.session.user.id);
-          console.log('Profile loaded during initialization:', profile);
-        } catch (profileError) {
-          console.error('Error loading profile during initialization:', profileError);
-        }
-      } else {
-        console.log('No active session during initialization');
+        await this.loadUserProfile(data.session.user.id);
       }
     } catch (error) {
-      console.error('Error during initialization:', error);
-    } finally {
-      this._initialized.set(true);
-      this._loading.set(false);
-      console.log('Service initialization complete. Logged in:', this.isLoggedIn());
+      console.error('Session initialization error:', error);
     }
   }
+
+
+  
 
   // Load user profile
   public async loadUserProfile(userId: string) {
@@ -333,29 +255,18 @@ export class SupabaseService {
 
   // Google OAuth sign in
   async signInWithGoogle() {
-    this._loading.set(true);
     try {
-      console.log('Starting Google sign-in flow');
-      
-      // Let Supabase handle the entire OAuth flow
       const { data, error } = await this.supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`
         }
       });
-      
-      if (error) {
-        console.error('Error starting Google OAuth flow:', error);
-        throw error;
-      }
-      
-      return data;
+
+      if (error) throw error;
     } catch (error) {
-      console.error('Exception during Google sign-in:', error);
+      console.error('Google Sign In Error:', error);
       throw error;
-    } finally {
-      this._loading.set(false);
     }
   }
 
@@ -549,6 +460,32 @@ async updatePassword(newPassword: string) {
       } catch (error) {
         console.error('Error handling OAuth redirect:', error);
       }
+    }
+  }
+
+  async checkAndRestoreSession() {
+    try {
+      console.log('Checking and restoring session...');
+      const { data, error } = await this.supabase.auth.getSession();
+      
+      if (error) {
+        console.error('Error getting session:', error);
+        return false;
+      }
+      
+      if (data?.session) {
+        console.log('Session restored:', data.session.user.id);
+        this._session.set(data.session);
+        this._user.set(data.session.user);
+        
+        await this.loadUserProfile(data.session.user.id);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error restoring session:', error);
+      return false;
     }
   }
 }
