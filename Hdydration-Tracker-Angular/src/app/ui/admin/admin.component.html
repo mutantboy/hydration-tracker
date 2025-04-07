@@ -24,7 +24,7 @@
       </thead>
       <tbody>
         <tr *ngFor="let entry of entries()">
-          <td>{{ entry.profiles?.email }}</td>
+          <td>{{ entry.userEmail }}</td>
           <td>{{ entry.created_at | date : "MMM d, yyyy" }}</td>
           <td>{{ entry.created_at | date : "h:mm a" }}</td>
           <td>{{ entry.amount }} ml</td>

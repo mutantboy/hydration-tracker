@@ -33,7 +33,6 @@ export class SupabaseService {
   public isAdmin = computed(() => this._profile()?.role === 'admin');
   
   constructor() {
-    // Simplified Supabase client creation
     this.supabase = createClient(environment.supabaseUrl, environment.supabaseKey, {
       auth: {
         persistSession: true,
@@ -42,7 +41,6 @@ export class SupabaseService {
       }
     });
     
-    // Simple auth state change listener
     this.supabase.auth.onAuthStateChange((event, session) => {
       console.log('Auth State Change:', event);
       
@@ -60,7 +58,6 @@ export class SupabaseService {
       }
     });
 
-    // Try to get existing session on service initialization
     this.initialize();
   }
 
@@ -428,12 +425,19 @@ async updatePassword(newPassword: string) {
     try {
       return await this.supabase
         .from('hydration_entries')
-        .select('*, profiles(email)')
+        .select(`
+          *,
+          profiles (
+            id,
+            email
+          )
+        `)
         .order('created_at', { ascending: false });
     } finally {
       this._loading.set(false);
     }
   }
+  
 
 
   private async handleRedirectIfNeeded() {

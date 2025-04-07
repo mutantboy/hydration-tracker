@@ -61,12 +61,15 @@ export class DashboardComponent implements OnInit {
     }
   }
 
-  async addEntry() {
-    if (this.newAmount() <= 0) return;
+  async addEntry(amount?: number) {
+    // Use the provided amount or the current newAmount
+    const entryAmount = amount || this.newAmount();
+    
+    if (entryAmount <= 0) return;
     
     try {
       this.loading.set(true);
-      const { data, error } = await this.supabaseService.createEntry(this.newAmount());
+      const { data, error } = await this.supabaseService.createEntry(entryAmount);
       
       if (error) throw error;
       
@@ -74,12 +77,19 @@ export class DashboardComponent implements OnInit {
         this.entries.update(currentEntries => [data as HydrationEntry, ...currentEntries]);
       }
       
-      this.newAmount.set(250);
+      // Reset newAmount to 250 only if no specific amount was provided
+      if (!amount) {
+        this.newAmount.set(250);
+      }
     } catch (error) {
       console.error('Error adding entry:', error);
     } finally {
       this.loading.set(false);
     }
+  }
+
+  setNewAmount(amount: number) {
+    this.newAmount.set(amount);
   }
 
   async deleteEntry(id: number) {

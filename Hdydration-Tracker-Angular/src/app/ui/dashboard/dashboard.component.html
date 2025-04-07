@@ -44,8 +44,7 @@
       <div class="input-group">
         <input
           type="number"
-          [ngModel]="newAmount()"
-          (ngModelChange)="addEntry()"
+          [(ngModel)]="newAmount"
           placeholder="Amount in ml"
           min="0"
           class="amount-input"
@@ -59,9 +58,9 @@
         </button>
       </div>
       <div class="quick-amounts">
-        <button class="quick-btn" (click)="addEntry()">250ml</button>
-        <button class="quick-btn" (click)="addEntry()">500ml</button>
-        <button class="quick-btn" (click)="addEntry()">750ml</button>
+        <button class="quick-btn" (click)="addEntry(250)">250ml</button>
+        <button class="quick-btn" (click)="addEntry(500)">500ml</button>
+        <button class="quick-btn" (click)="addEntry(750)">750ml</button>
       </div>
     </section>
 

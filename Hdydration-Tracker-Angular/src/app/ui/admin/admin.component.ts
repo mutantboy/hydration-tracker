@@ -23,9 +23,28 @@ export class AdminComponent implements OnInit {
       
       if (error) throw error;
       
-      this.entries.set(data as any[]);
+      const transformedEntries = data.map(entry => ({
+        ...entry,
+        userEmail: entry.profiles?.email || entry.user_id
+      }));
+      
+      this.entries.set(transformedEntries);
     } catch (error) {
       console.error('Error loading all entries:', error);
     }
   }
+    /*async loadAllEntries() {
+      try {
+        console.log('Attempting to load all entries');
+        const { data, error } = await this.supabaseService.getAllEntries();
+        
+        console.log('Query result:', { data, error });
+        
+        if (error) throw error;
+        
+        this.entries.set(data);
+      } catch (error) {
+        console.error('Error loading all entries:', error);
+      }
+    }*/
 }
